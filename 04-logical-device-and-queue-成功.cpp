@@ -1,10 +1,5 @@
 #include <vulkan/vulkan.h>
-
-#include <X11/Xlib.h>
-// vulkan 的 xlib 相關模組，一定要在X11/Xlib.h 被 include 之後才能 include ，因為有用到其中的定義。
-#include <vulkan/vulkan_xlib.h>
-
-
+#include <GLFW/glfw3.h>
 
 #include <iostream>
 #include <stdexcept>
@@ -13,7 +8,6 @@
 #include <algorithm>
 #include <cstring>
 #include <optional>
-#include <set>
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 800;
@@ -63,64 +57,36 @@ public:
 	}
 
 private:
-	Display *display;
-	Window window;
-	XEvent event;
-	int screen;
-	
+	GLFWwindow* window;
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debugMessenger;
-	VkSurfaceKHR surface;
-
 	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 	VkDevice device;
 	VkQueue graphicsQueue;
-	VkQueue presentQueue;
 
-	
 	void initWindow(){
+		glfwInit();
 
-		display = XOpenDisplay(nullptr);
-		if(display == NULL){
-			std::cerr << "無法連接到x伺服器" << std::endl;
-			exit(1);
-		}
-
-
-		screen = DefaultScreen(display);
-
-		window = XCreateWindow(display, RootWindow(display, screen), 100, 100, 640, 480, 1, CopyFromParent, InputOutput, CopyFromParent, 0, NULL);
-
-		XSelectInput(display, window, ExposureMask | KeyPressMask);
-		XMapWindow(display, window);
+		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+		glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+		
+		window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
 	}
-	
 
 	void initVulkan(){
 		createInstance();
 		// 調試信使必須在instance建立後才能創建，如果想看到 instance 創建時的資訊，必須在建立 instance 時也填入相應的調試資料
 		setupDebugMessenger();
-		createSurface();
 		pickPhysicalDevice();
 		createLogicalDevice();
 	
 	}
 
-	
 	void mainloop(){
-
-		while(1){
-			XNextEvent(display, &event);
-			if(event.type == Expose){
-
-			}
-			if(event.type == KeyPress){
-				break;
-			}
-
+		while(!glfwWindowShouldClose(window)){
+			glfwPollEvents();	//和glfwWaitEvents是相反的一對
 		}
 	}
-	
 
 	void cleanup(){
 		vkDestroyDevice(device, nullptr);
@@ -129,11 +95,11 @@ private:
 			DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
 		}
 
-		vkDestroySurfaceKHR(instance, surface, nullptr);
 		vkDestroyInstance(instance, nullptr);
 		
-		XDestroyWindow(display, window);
-		XCloseDisplay(display);
+		glfwDestroyWindow(window);
+		
+		glfwTerminate();
 	}
 	
 
@@ -167,11 +133,12 @@ private:
 
 	// 取得需要的 extension 名，視需要加入 validation 層需要的擴展
 	std::vector<const char*> getRequiredExtensions(){
+		uint32_t glfwExtensionCount = 0;
+		const char** glfwExtensions;
+		glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
-		std::vector<const char*> extensions;
-		extensions.push_back("VK_KHR_surface");
-		extensions.push_back("VK_KHR_xlib_surface");
-		
+		std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+
 		if(enableValidationLayers){
 			extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 		}
@@ -201,7 +168,6 @@ private:
 	}
 
 
-	// 創建 vulkan 實例
 	void createInstance(){
 		if(enableValidationLayers && !checkValidationLayerSupport()){
 			throw std::runtime_error("validation layers requested, but not available!");
@@ -287,22 +253,6 @@ private:
 		}
 	}
 
-
-	// 建立顯示的表面
-	void createSurface(){
-		VkXlibSurfaceCreateInfoKHR createInfo{};
-		createInfo.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
-		createInfo.dpy = display;
-		createInfo.window = window;
-
-
-		if(vkCreateXlibSurfaceKHR(instance, &createInfo, nullptr, &surface) != VK_SUCCESS){
-			throw std::runtime_error("failed to create window surface!");
-		}
-
-	}
-
-
 	// 檢查 GPU 是否是適合的
 	bool isDeviceSuitable(VkPhysicalDevice device){
 		VkPhysicalDeviceProperties deviceProperties;
@@ -314,9 +264,9 @@ private:
 		vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
 		
 		std::cout << "檢查特性支援" << std::endl;
-		std::cout << "shaderFloat64:\t" << deviceFeatures.shaderFloat64 << std::endl;
-		std::cout << "shaderInt64:\t" << deviceFeatures.shaderInt64 << std::endl;
-		std::cout << "geometryShader:\t" << deviceFeatures.geometryShader << std::endl;
+		std::cout << "shaderFloat64： " << deviceFeatures.shaderFloat64 << std::endl;
+		std::cout << "shaderInt64： " << deviceFeatures.shaderInt64 << std::endl;
+		std::cout << "geometryShader： " << deviceFeatures.geometryShader << std::endl;
 
 		QueueFamilyIndices indices = findQueueFamilies(device);
 
@@ -327,10 +277,9 @@ private:
 	// 存放隊列族索引的結構
 	struct QueueFamilyIndices{
 		std::optional<uint32_t> graphicsFamily;
-		std::optional<uint32_t> presentFamily;
 
 		bool isComplete(){
-			return graphicsFamily.has_value() && presentFamily.has_value();
+			return graphicsFamily.has_value();
 		}
 	};
 
@@ -349,15 +298,7 @@ private:
 			if(queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT){
 				indices.graphicsFamily = i;
 			}
-		
-			VkBool32 presentSupport = false;
-			vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
-
-			if(presentSupport){
-				indices.presentFamily = i;
-			}
-
-
+			
 			if(indices.isComplete()){
 				break;
 			}
@@ -414,27 +355,24 @@ private:
 	void createLogicalDevice(){
 		QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
 
-		std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-		std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(), indices.presentFamily.value()};
+		VkDeviceQueueCreateInfo queueCreateInfo{};
+		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
+		queueCreateInfo.queueCount = 1;
 
 		float queuePriority = 1.0f;
-
-		for(uint32_t queueFamily : uniqueQueueFamilies){
-			VkDeviceQueueCreateInfo queueCreateInfo{};
-			queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-			queueCreateInfo.queueFamilyIndex = queueFamily;
-			queueCreateInfo.queueCount = 1;
-			queueCreateInfo.pQueuePriorities = &queuePriority;
-			queueCreateInfos.push_back(queueCreateInfo);
-		}
+		queueCreateInfo.pQueuePriorities = &queuePriority;
 
 		VkPhysicalDeviceFeatures deviceFeatures{};
 
 		VkDeviceCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-		createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
-		createInfo.pQueueCreateInfos = queueCreateInfos.data();
+		
+		createInfo.pQueueCreateInfos = &queueCreateInfo;
+		createInfo.queueCreateInfoCount = 1;
+		
 		createInfo.pEnabledFeatures = &deviceFeatures;
+
 		createInfo.enabledExtensionCount = 0;
 
 		if(enableValidationLayers){
@@ -451,10 +389,7 @@ private:
 
 		// 取得 queue 的 handle
 		vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
-		vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
 	}
-
-
 };
 
 
