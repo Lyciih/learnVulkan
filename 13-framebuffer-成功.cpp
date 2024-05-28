@@ -944,6 +944,7 @@ private:
 			framebufferInfo.pAttachments = attachments;
 			framebufferInfo.width = swapChainExtent.width;
 			framebufferInfo.height = swapChainExtent.height;
+			framebufferInfo.layers = 1;
 
 			if(vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS){
 				throw std::runtime_error("failed to create framebuffer!");
