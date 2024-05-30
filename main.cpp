@@ -152,7 +152,7 @@ private:
 		atom = XInternAtom(display, "_NET_WM_WINDOW_OPACITY", False);
 		XChangeProperty(display, window, atom, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&opacity, 1);
 
-		XSelectInput(display, window, ExposureMask | KeyPressMask);
+		XSelectInput(display, window, ExposureMask | KeyPressMask | StructureNotifyMask);
 		XMapWindow(display, window);
 	}
 	
@@ -179,19 +179,39 @@ private:
 
 		while(1){
 			XNextEvent(display, &event);
+			switch(event.type){
+				case Expose:
+					drawFrame();
+					break;
+				case ConfigureNotify:
+					recreateSwapChain();
+					//std::cout << "123" << std::endl;
+					break;
+				case KeyPress:
+					return;
+				default:
+					break;
+			}
+
+			/*
 			if(event.type == Expose){
 				drawFrame();
 			}
 			if(event.type == KeyPress){
 				break;
 			}
+			*/
 		}
 
-		vkDeviceWaitIdle(device);
+
 	}
 	
 
 	void cleanup(){
+		vkDeviceWaitIdle(device);
+
+		cleanupSwapChain();
+
 		for(size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++){
 			vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
 			vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
@@ -200,19 +220,10 @@ private:
 
 		vkDestroyCommandPool(device, commandPool, nullptr);
 
-		for(auto framebuffer : swapChainFramebuffers){
-			vkDestroyFramebuffer(device, framebuffer, nullptr);
-		}
-		
 		vkDestroyPipeline(device, graphicsPipeline, nullptr);
 		vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
 		vkDestroyRenderPass(device, renderPass, nullptr);
 
-		for(auto imageView : swapChainImageViews){
-			vkDestroyImageView(device, imageView, nullptr);
-		}
-
-		vkDestroySwapchainKHR(device, swapChain, nullptr);
 		vkDestroyDevice(device, nullptr);
 
 		if(enableValidationLayers){
@@ -1163,6 +1174,31 @@ private:
 		vkQueuePresentKHR(presentQueue, &presentInfo);
 
 		currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+	}
+
+	// 視窗改變大小後，用來清除舊的swapchain等資源
+	void cleanupSwapChain(){
+		for(auto framebuffer : swapChainFramebuffers){
+			vkDestroyFramebuffer(device, framebuffer, nullptr);
+		}
+		
+		for(auto imageView : swapChainImageViews){
+			vkDestroyImageView(device, imageView, nullptr);
+		}
+		
+		vkDestroySwapchainKHR(device, swapChain, nullptr);
+	}
+
+
+	// 視窗改變大小後，用來重新產生對應的swapchain等資源
+	void recreateSwapChain(){
+		vkDeviceWaitIdle(device);
+
+		cleanupSwapChain();
+
+		createSwapChain();
+		createImageViews();
+		createFramebuffers();
 	}
 };
 
