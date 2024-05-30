@@ -84,7 +84,7 @@ private:
 	XWindowAttributes windowAttributes;
 
 	// 用來調整透明度
-	float window_opacity = 0.5;
+	float window_opacity = 1.0;
 	unsigned int opacity = (unsigned int)(window_opacity * 0xFFFFFFFF);
 	Atom atom;
 	
@@ -176,7 +176,7 @@ private:
 
 	
 	void mainloop(){
-		
+
 		while(1){
 			XNextEvent(display, &event);
 			switch(event.type){
@@ -185,13 +185,24 @@ private:
 					break;
 				case ConfigureNotify:
 					recreateSwapChain();
+					//std::cout << "123" << std::endl;
 					break;
 				case KeyPress:
 					return;
 				default:
 					break;
 			}
+
+			/*
+			if(event.type == Expose){
+				drawFrame();
+			}
+			if(event.type == KeyPress){
+				break;
+			}
+			*/
 		}
+
 
 	}
 	
