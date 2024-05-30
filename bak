@@ -1,8 +1,6 @@
 #include <vulkan/vulkan.h>
 
 #include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/Xatom.h>
 // vulkan 的 xlib 相關模組，一定要在X11/Xlib.h 被 include 之後才能 include ，因為有用到其中的定義。
 #include <vulkan/vulkan_xlib.h>
 
@@ -76,16 +74,10 @@ public:
 
 private:
 	Display *display;
-	Window root;
 	Window window;
 	XEvent event;
 	int screen;
 	XWindowAttributes windowAttributes;
-
-	// 用來調整透明度
-	float window_opacity = 0.5;
-	unsigned int opacity = (unsigned int)(window_opacity * 0xFFFFFFFF);
-	Atom atom;
 	
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debugMessenger;
@@ -129,27 +121,8 @@ private:
 
 
 		screen = DefaultScreen(display);
-		root = RootWindow(display, screen);
 
-		XVisualInfo visual_info;
-		if(!XMatchVisualInfo(display, screen, 32, TrueColor, &visual_info)){
-			std::cerr << "No visual found supporting 32-bit color\n";
-			exit(1);
-		}
-
-		Colormap colormap = XCreateColormap(display, root, visual_info.visual, AllocNone);
-
-		XSetWindowAttributes attrs;
-		attrs.colormap = colormap;
-		attrs.border_pixel = 0;
-		attrs.background_pixel = 0;
-
-		window = XCreateWindow(display, root, 100, 100, 640, 480, 1, visual_info.depth, InputOutput, visual_info.visual, CWColormap | CWBorderPixel | CWBackPixel, &attrs);
-
-
-
-		atom = XInternAtom(display, "_NET_WM_WINDOW_OPACITY", False);
-		XChangeProperty(display, window, atom, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&opacity, 1);
+		window = XCreateWindow(display, RootWindow(display, screen), 100, 100, 640, 480, 1, CopyFromParent, InputOutput, CopyFromParent, 0, NULL);
 
 		XSelectInput(display, window, ExposureMask | KeyPressMask);
 		XMapWindow(display, window);
@@ -175,18 +148,20 @@ private:
 
 	
 	void mainloop(){
+		drawFrame();
 
 		while(1){
 			XNextEvent(display, &event);
 			if(event.type == Expose){
-				drawFrame();
+
 			}
 			if(event.type == KeyPress){
 				break;
 			}
-		}
 
-		vkDeviceWaitIdle(device);
+			vkDeviceWaitIdle(device);
+
+		}
 	}
 	
 
