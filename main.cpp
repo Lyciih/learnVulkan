@@ -83,8 +83,8 @@ private:
 	int screen;
 	XWindowAttributes windowAttributes;
 
-	// 用來調整透明度
-	float window_opacity = 0.5;
+	// 用來調整透明度(這個透明度會影響整個視窗包括上方的欄跟關閉內容，視窗中的圖也會。此處設為1，所以只有vulkan渲染結果的透明度會被計算)
+	float window_opacity = 1.0;
 	unsigned int opacity = (unsigned int)(window_opacity * 0xFFFFFFFF);
 	Atom atom;
 	
@@ -149,8 +149,8 @@ private:
 
 
 
-		atom = XInternAtom(display, "_NET_WM_WINDOW_OPACITY", False);
-		XChangeProperty(display, window, atom, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&opacity, 1);
+		//atom = XInternAtom(display, "_NET_WM_WINDOW_OPACITY", False);
+		//XChangeProperty(display, window, atom, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&opacity, 1);
 
 		XSelectInput(display, window, ExposureMask | KeyPressMask | StructureNotifyMask);
 		XMapWindow(display, window);
@@ -1060,7 +1060,7 @@ private:
 		renderPassInfo.renderArea.offset = {0, 0};
 		renderPassInfo.renderArea.extent = swapChainExtent;
 		
-		VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+		VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 0.5f}}};
 		renderPassInfo.clearValueCount = 1;
 		renderPassInfo.pClearValues = &clearColor;
 
