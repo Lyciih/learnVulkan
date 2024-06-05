@@ -135,7 +135,11 @@ private:
 	Window root;
 	Window window;
 	XEvent event;
+	Atom wm_delete_window;
+	XConfigureEvent xce;
 	int screen;
+	uint32_t current_width = WIDTH;
+	uint32_t current_heigh = HEIGHT;
 	XWindowAttributes windowAttributes;
 
 	// 用來調整透明度(這個透明度會影響整個視窗包括上方的欄跟關閉內容，視窗中的圖也會。此處設為1，所以只有vulkan渲染結果的透明度會被計算)
@@ -216,6 +220,8 @@ private:
 		window = XCreateWindow(display, root, 100, 100, 640, 480, 1, visual_info.depth, InputOutput, visual_info.visual, CWColormap | CWBorderPixel | CWBackPixel, &attrs);
 
 
+		wm_delete_window = XInternAtom(display, "WM_DELETE_WINDOW", False);
+		XSetWMProtocols(display, window, &wm_delete_window, 1);
 
 		//atom = XInternAtom(display, "_NET_WM_WINDOW_OPACITY", False);
 		//XChangeProperty(display, window, atom, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&opacity, 1);
@@ -258,11 +264,21 @@ private:
 					drawFrame();
 					break;
 				case ConfigureNotify:
-					recreateSwapChain();
-					drawFrame();
+					xce = event.xconfigure;
+					if(current_width != (uint32_t)xce.width || current_heigh != (uint32_t)xce.height){
+						recreateSwapChain();
+						drawFrame();
+						current_width = xce.width;
+						current_heigh = xce.height;
+					}
 					break;
 				case KeyPress:
 					return;
+				case ClientMessage:
+					if((Atom)event.xclient.data.l[0] == wm_delete_window){
+						return;
+					}
+					break;
 				default:
 					break;
 			}
