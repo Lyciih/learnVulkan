@@ -1885,7 +1885,6 @@ private:
 		}
 	}
 
-	// 產生深度測試需要的資源
 	void createDepthResources(){
 		VkFormat depthFormat = findDepthFormat();
 
@@ -1912,7 +1911,6 @@ private:
 		throw std::runtime_error("failed to find supported format!");
 	}
 
-	// 尋找適合的深度format
 	VkFormat findDepthFormat(){
 		return findSupportedFormat(
 				{VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
@@ -1921,7 +1919,6 @@ private:
 		);
 	};
 
-	// 判斷format中是否包含stencil
 	bool hasStencilComponent(VkFormat format){
 		return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
 	}
